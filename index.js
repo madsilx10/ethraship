@@ -92,7 +92,9 @@ async function getTasks(token) {
     fetch(`${BASE_URL}/challenges/ethra-portal/tasks-status/1`, { headers: apiHeaders(token) }).then(r => r.json()),
     fetch(`${BASE_URL}/challenges/ethra-portal/tasks-status/2`, { headers: apiHeaders(token) }).then(r => r.json()),
   ]);
-  return [...(g1.tasksStatus || []), ...(g2.tasksStatus || [])];
+  const all = [...(g1.tasksStatus || []), ...(g2.tasksStatus || [])];
+  const seen = new Set();
+  return all.filter(t => { if (seen.has(t.taskGuid)) return false; seen.add(t.taskGuid); return true; });
 }
 
 async function doTask(token, taskGuid, extraArguments = []) {
