@@ -1,0 +1,12 @@
+{
+  "name": "ethraship",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "ethers": "^6.0.0",
+    "inquirer": "^9.0.0"
+  }
+}
