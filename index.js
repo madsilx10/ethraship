@@ -231,7 +231,13 @@ async function main() {
   let selected = [];
 
   if (choice === "1") {
-    selected = [wallets[0]];
+    const num = await prompt(`Wallet nomor berapa? (1-${wallets.length}): `);
+    const idx = parseInt(num) - 1;
+    if (idx < 0 || idx >= wallets.length) {
+      console.log("Nomor wallet tidak valid.");
+      process.exit(1);
+    }
+    selected = [wallets[idx]];
   } else if (choice === "2") {
     selected = wallets;
   } else if (choice === "3") {
