@@ -16,30 +16,26 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function prompt(question) {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   return new Promise((resolve) => {
-    rl.question(question, (answer) => {
-      rl.close();
-      resolve(answer.trim());
-    });
+    rl.question(question, (answer) => { rl.close(); resolve(answer.trim()); });
   });
 }
 
 function loadWallets() {
   return fs.readFileSync("wallets.txt", "utf-8")
-    .split("\n").map((l) => l.trim())
-    .filter((l) => l.length > 0 && !l.startsWith("#"));
+    .split("\n").map(l => l.trim()).filter(l => l && !l.startsWith("#"));
 }
 
 function loadAnswers() {
   return fs.readFileSync("answers.txt", "utf-8")
-    .split("\n").map((l) => l.trim())
-    .filter((l) => l.length > 0 && !l.startsWith("#"))
-    .map((l) => l.split(",").map((a) => a.trim()));
+    .split("\n").map(l => l.trim()).filter(l => l && !l.startsWith("#"))
+    .map(l => l.split(",").map(a => a.trim()));
 }
 
-const statusIcon = (s) => s === "SUCCESSFUL" ? "✓" : s === "PENDING" ? "◌" : s === "ERROR" ? "✗" : "?";
+const icon = (s) => s === "SUCCESSFUL" ? "✓" : s === "PENDING" ? "◌" : s === "ERROR" ? "✗" : "?";
+const log = (msg) => console.log(msg);
 
 // ============ AUTH ============
-function getPrivyHeaders(extra = {}) {
+function privyHeaders() {
   return {
     "Content-Type": "application/json",
     "privy-app-id": PRIVY_APP_ID,
@@ -47,119 +43,104 @@ function getPrivyHeaders(extra = {}) {
     "privy-client": "react-auth:3.21.3",
     "Origin": "https://app.ethraship.io",
     "Referer": "https://app.ethraship.io/",
-    ...extra,
+  };
+}
+
+function apiHeaders(token) {
+  return {
+    "Content-Type": "application/json",
+    "X-Privy-Access-Token": `Bearer ${token}`,
+    "Origin": "https://app.ethraship.io",
   };
 }
 
 async function login(wallet) {
-  const initRes = await fetch(`${PRIVY_URL}/api/v1/siwe/init`, {
-    method: "POST",
-    headers: getPrivyHeaders(),
+  const { nonce } = await fetch(`${PRIVY_URL}/api/v1/siwe/init`, {
+    method: "POST", headers: privyHeaders(),
     body: JSON.stringify({ address: wallet.address }),
-  });
-  const { nonce } = await initRes.json();
+  }).then(r => r.json());
 
   const issuedAt = new Date().toISOString();
   const message =
-    `app.ethraship.io wants you to sign in with your Ethereum account:\n` +
-    `${wallet.address}\n\n` +
+    `app.ethraship.io wants you to sign in with your Ethereum account:\n${wallet.address}\n\n` +
     `By signing, you are proving you own this wallet and logging in. This does not initiate a transaction or cost any fees.\n\n` +
-    `URI: https://app.ethraship.io\n` +
-    `Version: 1\n` +
-    `Chain ID: 21894\n` +
-    `Nonce: ${nonce}\n` +
-    `Issued At: ${issuedAt}\n` +
-    `Resources:\n- https://privy.io`;
+    `URI: https://app.ethraship.io\nVersion: 1\nChain ID: 21894\nNonce: ${nonce}\nIssued At: ${issuedAt}\nResources:\n- https://privy.io`;
 
   const signature = await wallet.signMessage(message);
 
-  const authRes = await fetch(`${PRIVY_URL}/api/v1/siwe/authenticate`, {
-    method: "POST",
-    headers: getPrivyHeaders(),
-    body: JSON.stringify({
-      message, signature, chainId: CHAIN_ID,
-      walletClientType: "metamask",
-      connectorType: "injected",
-      mode: "login-or-sign-up",
-      referralCode: REFERRAL_CODE,
-    }),
-  });
+  const data = await fetch(`${PRIVY_URL}/api/v1/siwe/authenticate`, {
+    method: "POST", headers: privyHeaders(),
+    body: JSON.stringify({ message, signature, chainId: CHAIN_ID, walletClientType: "metamask", connectorType: "injected", mode: "login-or-sign-up", referralCode: REFERRAL_CODE }),
+  }).then(r => r.json());
 
-  const authData = await authRes.json();
-  if (!authData.token) throw new Error("Login failed: " + JSON.stringify(authData));
-  return authData.token;
+  if (!data.token) throw new Error("Login gagal: " + JSON.stringify(data));
+  return data.token;
+}
+
+// ============ REFERRAL ============
+async function createReferral(token) {
+  await fetch(`${BASE_URL}/challenges/ethra-portal/create-referral/2`, {
+    method: "POST", headers: apiHeaders(token),
+    body: JSON.stringify({ referralCode: REFERRAL_CODE }),
+  });
 }
 
 // ============ TASKS ============
-async function fetchTasks(token, group) {
-  const res = await fetch(`${BASE_URL}/challenges/ethra-portal/tasks-status/${group}`, {
-    headers: {
-      "Content-Type": "application/json",
-      "X-Privy-Access-Token": `Bearer ${token}`,
-      "Origin": "https://app.ethraship.io",
-    },
-  });
-  const data = await res.json();
-  return data.tasksStatus || [];
-}
-
 async function getTasks(token) {
-  const [group1, group2] = await Promise.all([fetchTasks(token, 1), fetchTasks(token, 2)]);
-  return [...group1, ...group2];
+  const [g1, g2] = await Promise.all([
+    fetch(`${BASE_URL}/challenges/ethra-portal/tasks-status/1`, { headers: apiHeaders(token) }).then(r => r.json()),
+    fetch(`${BASE_URL}/challenges/ethra-portal/tasks-status/2`, { headers: apiHeaders(token) }).then(r => r.json()),
+  ]);
+  return [...(g1.tasksStatus || []), ...(g2.tasksStatus || [])];
 }
 
 async function doTask(token, taskGuid, extraArguments = []) {
-  const res = await fetch(`${BASE_URL}/challenges/do-task`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Privy-Access-Token": `Bearer ${token}`,
-      "Origin": "https://app.ethraship.io",
-    },
+  return fetch(`${BASE_URL}/challenges/do-task`, {
+    method: "POST", headers: apiHeaders(token),
     body: JSON.stringify({ taskGuid, extraArguments }),
-  });
-  return res.json();
+  }).then(r => r.json());
 }
 
 // ============ TASK RUNNERS ============
-async function runClickLink(token, task) {
-  const result = await doTask(token, task.taskGuid);
-  console.log(`  ${statusIcon(result.state)} click_link  │ ${task.title} │ ${result.points ?? 0} pts`);
-}
-
-async function runRetweet(token, task) {
-  const result = await doTask(token, task.taskGuid);
-  console.log(`  ${statusIcon(result.state)} retweet     │ ${task.title} │ ${result.points ?? 0} pts`);
+async function runSimpleTask(token, task, label) {
+  if (task.status === "SUCCESSFUL") {
+    log(`  ✓ ${label.padEnd(10)} ${task.title}`);
+    return;
+  }
+  const r = await doTask(token, task.taskGuid);
+  log(`  ${icon(r.state)} ${label.padEnd(10)} ${task.title} │ ${r.points ?? 0} pts`);
 }
 
 async function runQuestionnaire(token, task, answers) {
-  if (!answers || answers.length === 0) {
-    console.log(`  - quiz       │ ${task.title} │ skip (no answers)`);
+  if (task.status === "SUCCESSFUL") {
+    log(`  ✓ quiz       ${task.title}`);
     return;
   }
-
-  console.log(`  ◌ quiz       │ ${task.title} │ ${answers.length} soal`);
+  if (!answers || answers.length === 0) {
+    log(`  - quiz       ${task.title} │ no answers`);
+    return;
+  }
+  log(`  ◌ quiz       ${task.title}`);
   for (let i = 0; i < answers.length; i++) {
-    const answerIndex = answers[i];
-    const result = await doTask(token, task.taskGuid, [answerIndex]);
-    console.log(`    ${statusIcon(result.state)} Q${String(i + 1).padStart(2, "0")} │ jawaban: ${answerIndex}`);
+    const r = await doTask(token, task.taskGuid, [answers[i]]);
+    log(`    ${icon(r.state)} Q${String(i+1).padStart(2,"0")} → ${answers[i]}`);
     await sleep(1000);
   }
 }
 
 // ============ MAIN RUNNER ============
-async function runWallet(privateKey, answers, walletIndex) {
+async function runWallet(privateKey, answers, idx) {
   const wallet = new ethers.Wallet(privateKey);
-  console.log(`\n${"─".repeat(70)}`);
-  console.log(`  Wallet ${walletIndex + 1} │ ${wallet.address}`);
-  console.log(`${"─".repeat(70)}`);
+  log(`\n── Wallet ${idx+1} ─────────────────────────────────────────────────────`);
+  log(`   ${wallet.address}`);
 
   let token;
   try {
     token = await login(wallet);
-    console.log(`  ✓ Login OK`);
+    try { await createReferral(token); } catch (_) {}
+    log(`   ✓ Login OK`);
   } catch (e) {
-    console.log(`  ✗ Login gagal: ${e.message}`);
+    log(`   ✗ Login gagal: ${e.message}`);
     return;
   }
 
@@ -167,76 +148,68 @@ async function runWallet(privateKey, answers, walletIndex) {
   try {
     tasks = await getTasks(token);
   } catch (e) {
-    console.log(`  ✗ Gagal fetch tasks: ${e.message}`);
+    log(`   ✗ Fetch tasks gagal: ${e.message}`);
     return;
   }
 
-  const pending = tasks.filter((t) => t.status !== "SUCCESSFUL");
-  console.log(`  Tasks pending: ${pending.length} / ${tasks.length}\n`);
+  const done = tasks.filter(t => t.status === "SUCCESSFUL").length;
+  log(`   Tasks: ${done}/${tasks.length} selesai\n`);
 
-  let quizIndex = 0;
-  for (const task of pending) {
+  let quizIdx = 0;
+  for (const task of tasks) {
     try {
       if (task.taskName === "click_link") {
-        await runClickLink(token, task);
+        await runSimpleTask(token, task, "link");
       } else if (task.taskName === "retweet_post") {
-        await runRetweet(token, task);
+        await runSimpleTask(token, task, "retweet");
       } else if (task.taskName === "questionnaire") {
-        await runQuestionnaire(token, task, answers[quizIndex]);
-        quizIndex++;
-      } else {
-        console.log(`  - skip       │ ${task.taskName} │ ${task.title}`);
+        await runQuestionnaire(token, task, answers[quizIdx]);
+        quizIdx++;
       }
-      await sleep(1500);
+      // task lain di-skip diam-diam
+      if (task.status !== "SUCCESSFUL") await sleep(1500);
     } catch (e) {
-      console.log(`  ✗ Error ${task.taskName}: ${e.message}`);
+      log(`   ✗ Error: ${e.message}`);
     }
   }
 
-  console.log(`\n  ✓ Selesai: ${wallet.address}`);
+  log(`\n   ✓ Selesai`);
 }
 
-// ============ ENTRY POINT ============
+// ============ ENTRY ============
 async function main() {
-  console.log("\n╔══════════════════════════════╗");
-  console.log("║      EthraShip Bot           ║");
-  console.log(`║  Ref: ${REFERRAL_CODE}  ║`);
-  console.log("╚══════════════════════════════╝\n");
-  console.log("  1. Jalankan 1 wallet");
-  console.log("  2. Jalankan semua wallet");
-  console.log("  3. Jalankan dari wallet ke-N sampai akhir\n");
+  log("\n  EthraShip Bot");
+  log("  ─────────────");
+  log("  1. 1 wallet");
+  log("  2. Semua wallet");
+  log("  3. Dari wallet ke-N\n");
 
-  const choice = await prompt("Pilih (1/2/3): ");
+  const choice = await prompt("Pilih: ");
   const wallets = loadWallets();
   const answers = loadAnswers();
-
   let selected = [];
 
   if (choice === "1") {
-    const num = await prompt(`Wallet nomor berapa? (1-${wallets.length}): `);
-    const idx = parseInt(num) - 1;
-    if (idx < 0 || idx >= wallets.length) { console.log("Nomor tidak valid."); process.exit(1); }
-    selected = [{ key: wallets[idx], idx }];
+    const n = parseInt(await prompt(`Wallet ke (1-${wallets.length}): `)) - 1;
+    if (n < 0 || n >= wallets.length) { log("Tidak valid."); process.exit(1); }
+    selected = [{ key: wallets[n], idx: n }];
   } else if (choice === "2") {
     selected = wallets.map((key, idx) => ({ key, idx }));
   } else if (choice === "3") {
-    const from = await prompt(`Mulai dari wallet ke (1-${wallets.length}): `);
-    const idx = parseInt(from) - 1;
-    selected = wallets.slice(idx).map((key, i) => ({ key, idx: idx + i }));
+    const n = parseInt(await prompt(`Mulai dari wallet ke (1-${wallets.length}): `)) - 1;
+    selected = wallets.slice(n).map((key, i) => ({ key, idx: n + i }));
   } else {
-    console.log("Pilihan tidak valid."); process.exit(1);
+    log("Tidak valid."); process.exit(1);
   }
 
-  console.log(`\n  Total wallet: ${selected.length}\n`);
+  log(`\n  Total: ${selected.length} wallet\n`);
 
   for (let i = 0; i < selected.length; i++) {
     await runWallet(selected[i].key, answers, selected[i].idx);
     if (i < selected.length - 1) await sleep(3000);
   }
 
-  console.log(`\n${"═".repeat(70)}`);
-  console.log(`  ✓ Semua wallet selesai`);
-  console.log(`${"═".repeat(70)}\n`);
+  log("\n  ✓ Semua wallet selesai\n");
 }
 
 main().catch(console.error);
