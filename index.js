@@ -12,7 +12,7 @@ const PRIVY_URL = "https://auth.privy.io";
 
 // ============ HELPERS ============
 function log(msg) {
-  console.log(`[${new Date().toLocaleTimeString()}] ${msg}`);
+  console.log(msg);
 }
 
 function sleep(ms) {
@@ -34,7 +34,7 @@ function loadWallets() {
   return file
     .split("\n")
     .map((l) => l.trim())
-    .filter((l) => l.length > 0);
+    .filter((l) => l.length > 0 && !l.startsWith("#"));
 }
 
 function loadAnswers() {
@@ -42,12 +42,12 @@ function loadAnswers() {
   return file
     .split("\n")
     .map((l) => l.trim())
-    .filter((l) => l.length > 0)
+    .filter((l) => l.length > 0 && !l.startsWith("#"))
     .map((l) => l.split(",").map((a) => a.trim()));
 }
 
 // ============ AUTH ============
-async function getPrivyHeaders(extra = {}) {
+function getPrivyHeaders(extra = {}) {
   return {
     "Content-Type": "application/json",
     "privy-app-id": PRIVY_APP_ID,
@@ -60,15 +60,13 @@ async function getPrivyHeaders(extra = {}) {
 }
 
 async function login(wallet) {
-  // 1. Init - get nonce
   const initRes = await fetch(`${PRIVY_URL}/api/v1/siwe/init`, {
     method: "POST",
-    headers: await getPrivyHeaders(),
+    headers: getPrivyHeaders(),
     body: JSON.stringify({ address: wallet.address }),
   });
   const { nonce } = await initRes.json();
 
-  // 2. Build SIWE message
   const issuedAt = new Date().toISOString();
   const message =
     `app.ethraship.io wants you to sign in with your Ethereum account:\n` +
@@ -81,13 +79,11 @@ async function login(wallet) {
     `Issued At: ${issuedAt}\n` +
     `Resources:\n- https://privy.io`;
 
-  // 3. Sign
   const signature = await wallet.signMessage(message);
 
-  // 4. Authenticate
   const authRes = await fetch(`${PRIVY_URL}/api/v1/siwe/authenticate`, {
     method: "POST",
-    headers: await getPrivyHeaders(),
+    headers: getPrivyHeaders(),
     body: JSON.stringify({
       message,
       signature,
@@ -111,10 +107,14 @@ async function getTasks(token) {
     headers: {
       "Content-Type": "application/json",
       "X-Privy-Access-Token": `Bearer ${token}`,
+      "Origin": "https://app.ethraship.io",
     },
   });
   const data = await res.json();
-  return data.tasksStatus || [];
+  const tasks = data.tasksStatus || [];
+  const quiz = tasks.find(t => t.taskName === "questionnaire");
+  if (quiz) console.log(JSON.stringify(quiz, null, 2));
+  return tasks;
 }
 
 async function doTask(token, taskGuid, extraArguments = []) {
@@ -123,6 +123,7 @@ async function doTask(token, taskGuid, extraArguments = []) {
     headers: {
       "Content-Type": "application/json",
       "X-Privy-Access-Token": `Bearer ${token}`,
+      "Origin": "https://app.ethraship.io",
     },
     body: JSON.stringify({ taskGuid, extraArguments }),
   });
@@ -146,23 +147,30 @@ async function runQuestionnaire(token, task, answers) {
     return;
   }
 
-  // Get questions from task arguments
-  const questionsArg = task.arguments.find((a) => a.name === "questions");
+  // Parse questions from task arguments array
+  const args = task.arguments || [];
+  const questionsArg = args.find((a) => a.name === "questions");
   if (!questionsArg) {
-    log(`[quiz] ${task.title} → skip (no questions found)`);
+    log(`[quiz] ${task.title} → skip (no questions found in task)`);
     return;
   }
 
-  const questions = JSON.parse(questionsArg.value);
+  let questions;
+  try {
+    questions = JSON.parse(questionsArg.value);
+  } catch (e) {
+    log(`[quiz] ${task.title} → skip (failed to parse questions)`);
+    return;
+  }
 
   for (let i = 0; i < questions.length; i++) {
     const q = questions[i];
     const answerIndex = parseInt(answers[i] ?? "0");
-    const answerText = q.options[answerIndex];
+    const answerText = q.options?.[answerIndex] ?? "";
     const extraArguments = [String(answerIndex), answerText];
 
     const result = await doTask(token, task.taskGuid, extraArguments);
-    log(`[quiz] Q${i + 1}: ${answerIndex} → ${result.state}`);
+    log(`[quiz] Q${i + 1}: pilihan ${answerIndex} → ${result.state}`);
     await sleep(1000);
   }
 }
@@ -188,7 +196,6 @@ async function runWallet(privateKey, answers, walletIndex) {
     return;
   }
 
-  // Filter only pending tasks
   const pending = tasks.filter((t) => t.status !== "SUCCESSFUL");
   log(`Tasks pending: ${pending.length}`);
 
@@ -212,7 +219,7 @@ async function runWallet(privateKey, answers, walletIndex) {
     }
   }
 
-  log(`=== Done: ${wallet.address} ===`);
+  log(`=== Done: ${wallet.address} ===\n`);
 }
 
 // ============ ENTRY POINT ============
@@ -220,14 +227,14 @@ async function main() {
   console.log("\n=== EthraShip Bot ===");
   console.log("Referral:", REFERRAL_CODE);
   console.log("");
-  console.log("1. Jalankan 1 wallet (urutan pertama)");
+  console.log("1. Jalankan 1 wallet");
   console.log("2. Jalankan semua wallet");
   console.log("3. Jalankan dari wallet ke-N sampai akhir");
   console.log("");
 
   const choice = await prompt("Pilih (1/2/3): ");
 
-  let wallets = loadWallets();
+  const wallets = loadWallets();
   const answers = loadAnswers();
 
   let selected = [];
@@ -236,16 +243,16 @@ async function main() {
     const num = await prompt(`Wallet nomor berapa? (1-${wallets.length}): `);
     const idx = parseInt(num) - 1;
     if (idx < 0 || idx >= wallets.length) {
-      console.log("Nomor wallet tidak valid.");
+      console.log("Nomor tidak valid.");
       process.exit(1);
     }
-    selected = [wallets[idx]];
+    selected = [{ key: wallets[idx], idx }];
   } else if (choice === "2") {
-    selected = wallets;
+    selected = wallets.map((key, idx) => ({ key, idx }));
   } else if (choice === "3") {
     const from = await prompt(`Mulai dari wallet ke (1-${wallets.length}): `);
     const idx = parseInt(from) - 1;
-    selected = wallets.slice(idx);
+    selected = wallets.slice(idx).map((key, i) => ({ key, idx: idx + i }));
   } else {
     console.log("Pilihan tidak valid.");
     process.exit(1);
@@ -254,11 +261,11 @@ async function main() {
   console.log(`\nTotal wallet: ${selected.length}\n`);
 
   for (let i = 0; i < selected.length; i++) {
-    await runWallet(selected[i], answers, wallets.indexOf(selected[i]));
+    await runWallet(selected[i].key, answers, selected[i].idx);
     if (i < selected.length - 1) await sleep(3000);
   }
 
-  console.log("\n=== Selesai ===");
+  console.log("=== Selesai ===");
 }
 
 main().catch(console.error);
