@@ -81,6 +81,7 @@ async function login(wallet) {
       walletClientType: "metamask",
       connectorType: "injected",
       mode: "login-or-sign-up",
+      referralCode: REFERRAL_CODE,
     }),
   });
 
@@ -137,28 +138,11 @@ async function runQuestionnaire(token, task, answers) {
     return;
   }
 
-  const args = task.arguments || [];
-  const questionsArg = args.find((a) => a.name === "questions");
-  if (!questionsArg) {
-    console.log(`  - quiz       │ ${task.title} │ skip (no questions)`);
-    return;
-  }
-
-  let questions;
-  try {
-    questions = JSON.parse(questionsArg.value);
-  } catch (e) {
-    console.log(`  ✗ quiz       │ ${task.title} │ failed parse questions`);
-    return;
-  }
-
-  console.log(`  ◌ quiz       │ ${task.title} │ ${questions.length} soal`);
-  for (let i = 0; i < questions.length; i++) {
-    const q = questions[i];
-    const answerIndex = parseInt(answers[i] ?? "0");
-    const answerText = q.options?.[answerIndex] ?? "";
-    const result = await doTask(token, task.taskGuid, [String(answerIndex), answerText]);
-    console.log(`    ${statusIcon(result.state)} Q${String(i + 1).padStart(2, "0")} │ ${q.questionText.slice(0, 50)}... → ${answerText.slice(0, 30)}`);
+  console.log(`  ◌ quiz       │ ${task.title} │ ${answers.length} soal`);
+  for (let i = 0; i < answers.length; i++) {
+    const answerIndex = answers[i];
+    const result = await doTask(token, task.taskGuid, [answerIndex]);
+    console.log(`    ${statusIcon(result.state)} Q${String(i + 1).padStart(2, "0")} │ jawaban: ${answerIndex}`);
     await sleep(1000);
   }
 }
