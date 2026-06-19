@@ -148,6 +148,7 @@ async function runQuestionnaire(token, task, answers) {
   }
 
   // Parse questions from task arguments array
+  log(`[quiz] task data: ${JSON.stringify(task, null, 2)}`);
   const args = task.arguments || [];
   const questionsArg = args.find((a) => a.name === "questions");
   if (!questionsArg) {
