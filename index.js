@@ -26,9 +26,10 @@ function loadWallets() {
 }
 
 function loadAnswers() {
-  return fs.readFileSync("answers.txt", "utf-8")
-    .split("\n").map(l => l.trim()).filter(l => l && !l.startsWith("#"))
-    .map(l => l.split(",").map(a => a.trim()));
+  const raw = fs.readFileSync("answers.txt", "utf-8");
+  return raw.split(/\n\s*\n/).map(block =>
+    block.split("\n").map(l => l.trim()).filter(l => l && !l.startsWith("#"))
+  ).filter(g => g.length > 0);
 }
 
 const icon = (s) => s === "SUCCESSFUL" ? "✓" : s === "PENDING" ? "◌" : s === "ERROR" ? "✗" : "?";
@@ -122,8 +123,9 @@ async function runQuestionnaire(token, task, answers) {
   }
   log(`  ◌ quiz       ${task.title}`);
   for (let i = 0; i < answers.length; i++) {
-    const r = await doTask(token, task.taskGuid, [answers[i]]);
-    log(`    ${icon(r.state)} Q${String(i+1).padStart(2,"0")} → ${answers[i]}`);
+    const text = answers[i];
+    const r = await doTask(token, task.taskGuid, [String(i), text]);
+    log(`    ${icon(r.state)} Q${String(i+1).padStart(2,"0")} → ${text.slice(0,50)}`);
     await sleep(1000);
   }
 }
