@@ -25,10 +25,25 @@ function loadWallets() {
     .split("\n").map(l => l.trim()).filter(l => l && !l.startsWith("#"));
 }
 
+const LETTER_TO_INDEX = { A: 0, B: 1, C: 2, D: 3, E: 4, F: 5 };
+
+function parseAnswerLine(line) {
+  // Format: "A - teks jawaban" atau "A. teks jawaban" atau "A: teks jawaban"
+  const m = line.match(/^([A-Fa-f])\s*[-.:)]\s*(.+)$/);
+  if (!m) {
+    throw new Error(`Format baris jawaban tidak dikenali: "${line}". Harus "A - teks jawaban"`);
+  }
+  const letter = m[1].toUpperCase();
+  const text = m[2].trim();
+  return { letter, index: LETTER_TO_INDEX[letter], text };
+}
+
 function loadAnswers() {
   const raw = fs.readFileSync("answers.txt", "utf-8");
   return raw.split(/\n\s*\n/).map(block =>
-    block.split("\n").map(l => l.trim()).filter(l => l && !l.startsWith("#"))
+    block.split("\n").map(l => l.trim())
+      .filter(l => l && !l.startsWith("#") && !/^task\s*\d*$/i.test(l))
+      .map(parseAnswerLine)
   ).filter(g => g.length > 0);
 }
 
@@ -125,9 +140,10 @@ async function runQuestionnaire(token, task, answers) {
   }
   log(`  ◌ quiz       ${task.title}`);
   for (let i = 0; i < answers.length; i++) {
-    const text = answers[i];
-    const r = await doTask(token, task.taskGuid, [String(i), text]);
-    log(`    ${icon(r.state)} Q${String(i+1).padStart(2,"0")} → ${text.slice(0,50)}`);
+    const { letter, index, text } = answers[i];
+    const r = await doTask(token, task.taskGuid, [String(index), text]);
+    log(`    ${icon(r.state)} Q${String(i+1).padStart(2,"0")} → [${letter}] ${text.slice(0,50)}`);
+    if (r.state !== "SUCCESSFUL") log(`      ↳ raw: ${JSON.stringify(r)}`);
     await sleep(1000);
   }
 }
