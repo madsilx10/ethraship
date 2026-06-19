@@ -53,6 +53,8 @@ async function getPrivyHeaders(extra = {}) {
     "privy-app-id": PRIVY_APP_ID,
     "privy-ca-id": PRIVY_CA_ID,
     "privy-client": "react-auth:3.21.3",
+    "Origin": "https://app.ethraship.io",
+    "Referer": "https://app.ethraship.io/",
     ...extra,
   };
 }
