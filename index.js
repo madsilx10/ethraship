@@ -26,7 +26,7 @@ function loadWallets() {
 }
 
 function loadAnswers() {
-  const raw = fs.readFileSync("answers.txt", "utf-8");
+  const raw = fs.readFileSync("answers.txt", "utf-8").replace(/\r/g, "");
   return raw.split(/\n\s*\n/).map(block =>
     block.split("\n").map(l => l.trim()).filter(l => l && !l.startsWith("#"))
     .map(l => { const [idx, ...rest] = l.split(","); return { idx: idx.trim(), text: rest.join(",").trim() }; })
@@ -193,6 +193,7 @@ async function main() {
   const choice = await prompt("Pilih: ");
   const wallets = loadWallets();
   const answers = loadAnswers();
+  log(`   Answers loaded: ${answers.length} quiz`);
   let selected = [];
 
   if (choice === "1") {
