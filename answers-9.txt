@@ -1,0 +1,32 @@
+0,It requires significant capital, domain expertise, and operational involvement
+0,Ticket size -- large upfront capital requirements
+2,Investors generally cannot exit on demand; transfers require manager approval and legal steps
+2,Decision-making is concentrated with operators, leaving investors with limited visibility into key operational choices
+0,Valuations rely on broker indications and comparable sales that are not always auditable to outside investors
+2,Information is distributed across multiple parties -- technical managers, brokers, insurers, legal entities -- rather than consolidated
+3,Access is organized through closed fundraising rounds and manual onboarding, limiting the addressable investor base
+2,It provides tangible hard-asset collateral, cash flow through chartering, and exposure to real macroeconomic trade dynamics
+1,Vessel values, earnings, and risks vary significantly by segment, age, specification, and trading pattern
+3,Transfers require bespoke coordination between seller, buyer, manager, and legal parties -- making ownership changes slow and uncertain
+
+1,Governance signaling and ecosystem participation
+3,Ethra Invest
+2,The SHIP Ecosystem Layer and the RWA Investment Layer
+3,Ownership, revenue, or dividend rights from maritime assets
+2,KYC/AML and investor eligibility verification
+1,2021
+2,There is no automatic economic linkage between the two
+1,Obtain SHIP and hold it in a self-custodied wallet
+2,Treating ecosystem utility participation and asset-level investment as distinct products with distinct legal rights
+3,On-chain visibility of staking balances, governance outcomes, and token supply
+
+2,80%
+1,12+ billion tons
+3,Iron ore, coal, and agricultural products
+0,Time Charter Equivalent
+2,New vessels require multi-year construction lead times, so fleet capacity cannot expand quickly
+3,Small cargo demand surprises can trigger outsized freight rate movements
+2,From c.27% to c.36%
+3,Infrastructure programs and urbanization across India, Southeast Asia, and Africa
+0,They have extended voyage distances, increasing ton-mile demand even with moderate aggregate trade growth
+2,c.2%
