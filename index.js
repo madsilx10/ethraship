@@ -90,7 +90,9 @@ async function createReferral(token) {
 // ============ TASKS ============
 async function getTasks(token) {
   const r = await fetch(`${BASE_URL}/challenges/ethra-portal/tasks-status/2`, { headers: apiHeaders(token) }).then(r => r.json());
-  return r.tasksStatus || [];
+  const tasks = r.tasksStatus || [];
+  log(`   Raw tasks: ${tasks.length}, quiz: ${tasks.filter(t=>t.taskName==='questionnaire').length}`);
+  return tasks;
 }
 
 async function doTask(token, taskGuid, extraArguments = []) {
