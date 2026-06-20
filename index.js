@@ -169,6 +169,7 @@ async function runWallet(privateKey, answers, idx) {
       } else if (task.taskName === "retweet_post") {
         await runSimpleTask(token, task, "retweet");
       } else if (task.taskName === "questionnaire") {
+        log(`   [quiz ${quizIdx}] ${task.title}`);
         await runQuestionnaire(token, task, answers[quizIdx]);
         quizIdx++;
       }
