@@ -33,7 +33,7 @@ function loadAnswers() {
   ).filter(g => g.length > 0);
 }
 
-const icon = (s) => s === "SUCCESSFUL" ? "✓" : s === "PENDING" ? "◌" : s === "ERROR" ? "✗" : "?";
+const icon = (s) => s === "SUCCESSFUL" ? "✅" : s === "PENDING" ? "⏳" : s === "ERROR" ? "❌" : "?";
 const log = (msg) => console.log(msg);
 
 // ============ AUTH ============
@@ -103,29 +103,29 @@ async function doTask(token, taskGuid, extraArguments = []) {
 }
 
 // ============ TASK RUNNERS ============
-async function runSimpleTask(token, task, label) {
+async function runSimpleTask(token, task, w) {
   if (task.status === "SUCCESSFUL") {
-    log(`  ✓ ${label.padEnd(10)} ${task.title}`);
+    log(`${w} ✅ ${task.title}`);
     return;
   }
   const r = await doTask(token, task.taskGuid);
-  log(`  ${icon(r.state)} ${label.padEnd(10)} ${task.title} │ ${r.points ?? 0} pts`);
+  const pts = r.points ? ` (${parseFloat(r.points).toFixed(0)}p)` : '';
+  log(`${w} ${icon(r.state)} ${task.title}${pts}`);
 }
 
-async function runQuestionnaire(token, task, answers) {
+async function runQuestionnaire(token, task, answers, w) {
   if (task.status === "SUCCESSFUL") {
-    log(`  ✓ quiz       ${task.title}`);
+    log(`${w} ✅ ${task.title}`);
     return;
   }
   if (!answers || answers.length === 0) {
-    log(`  - quiz       ${task.title} │ no answers`);
+    log(`${w} - ${task.title} (no answers)`);
     return;
   }
-  log(`  ◌ quiz       ${task.title} | guid: ${task.taskGuid}`);
   for (let i = 0; i < answers.length; i++) {
     const { text } = answers[i];
     const r = await doTask(token, task.taskGuid, [String(i), text]);
-    log(`    ${icon(r.state)} Q${String(i+1).padStart(2,"0")} → ${text.slice(0,45)} | ${JSON.stringify(r)}`);
+    if (r.state === "SUCCESSFUL") log(`${w} ✅ ${task.title}`);
     await sleep(1000);
   }
 }
@@ -133,16 +133,17 @@ async function runQuestionnaire(token, task, answers) {
 // ============ MAIN RUNNER ============
 async function runWallet(privateKey, answers, idx) {
   const wallet = new ethers.Wallet(privateKey);
-  log(`\n── Wallet ${idx+1} ─────────────────────────────────────────────────────`);
-  log(`   ${wallet.address}`);
+  const w = `[Wallet ${idx+1}]`;
+  log(`\n${w} Mulai...`);
+  log(`${w} ${wallet.address}`);
 
   let token;
   try {
     token = await login(wallet);
     try { await createReferral(token); } catch (_) {}
-    log(`   ✓ Login OK`);
+    log(`${w} ✅ Login OK`);
   } catch (e) {
-    log(`   ✗ Login gagal: ${e.message}`);
+    log(`${w} ❌ Login gagal: ${e.message}`);
     return;
   }
 
@@ -150,33 +151,31 @@ async function runWallet(privateKey, answers, idx) {
   try {
     tasks = await getTasks(token);
   } catch (e) {
-    log(`   ✗ Fetch tasks gagal: ${e.message}`);
+    log(`${w} ❌ Fetch tasks gagal: ${e.message}`);
     return;
   }
 
   const done = tasks.filter(t => t.status === "SUCCESSFUL").length;
-  log(`   Tasks: ${done}/${tasks.length} selesai\n`);
+  log(`${w} ${done}/${tasks.length} task selesai`);
 
   let quizIdx = 0;
   for (const task of tasks) {
     try {
       if (task.taskName === "click_link") {
-        await runSimpleTask(token, task, "link");
+        await runSimpleTask(token, task, w);
       } else if (task.taskName === "retweet_post") {
-        await runSimpleTask(token, task, "retweet");
+        await runSimpleTask(token, task, w);
       } else if (task.taskName === "questionnaire") {
-        log(`   [quiz ${quizIdx}] ${task.title}`);
-        await runQuestionnaire(token, task, answers[quizIdx]);
+        await runQuestionnaire(token, task, answers[quizIdx], w);
         quizIdx++;
       }
-      // task lain di-skip diam-diam
       if (task.status !== "SUCCESSFUL") await sleep(1500);
     } catch (e) {
-      log(`   ✗ Error: ${e.message}`);
+      log(`${w} ❌ Error: ${e.message}`);
     }
   }
 
-  log(`\n   ✓ Selesai`);
+  log(`${w} ✅ Selesai!`);
 }
 
 // ============ ENTRY ============
@@ -213,7 +212,7 @@ async function main() {
     if (i < selected.length - 1) await sleep(3000);
   }
 
-  log("\n  ✓ Semua wallet selesai\n");
+  log("\n  ✅ Semua wallet selesai\n");
 }
 
 main().catch(console.error);
