@@ -124,7 +124,7 @@ async function runQuestionnaire(token, task, answers) {
   log(`  ◌ quiz       ${task.title} | guid: ${task.taskGuid}`);
   for (let i = 0; i < answers.length; i++) {
     const { text } = answers[i];
-    const r = await doTask(token, task.taskGuid, [String(i)]);
+    const r = await doTask(token, task.taskGuid, [String(i), text]);
     log(`    ${icon(r.state)} Q${String(i+1).padStart(2,"0")} → ${text.slice(0,45)} | ${JSON.stringify(r)}`);
     await sleep(1000);
   }
