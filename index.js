@@ -89,13 +89,8 @@ async function createReferral(token) {
 
 // ============ TASKS ============
 async function getTasks(token) {
-  const [g1, g2] = await Promise.all([
-    fetch(`${BASE_URL}/challenges/ethra-portal/tasks-status/1`, { headers: apiHeaders(token) }).then(r => r.json()),
-    fetch(`${BASE_URL}/challenges/ethra-portal/tasks-status/2`, { headers: apiHeaders(token) }).then(r => r.json()),
-  ]);
-  const all = [...(g1.tasksStatus || []), ...(g2.tasksStatus || [])];
-  const seen = new Set();
-  return all.filter(t => { if (seen.has(t.taskGuid)) return false; seen.add(t.taskGuid); return true; });
+  const r = await fetch(`${BASE_URL}/challenges/ethra-portal/tasks-status/2`, { headers: apiHeaders(token) }).then(r => r.json());
+  return r.tasksStatus || [];
 }
 
 async function doTask(token, taskGuid, extraArguments = []) {
