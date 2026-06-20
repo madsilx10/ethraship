@@ -121,11 +121,11 @@ async function runQuestionnaire(token, task, answers) {
     log(`  - quiz       ${task.title} │ no answers`);
     return;
   }
-  log(`  ◌ quiz       ${task.title}`);
+  log(`  ◌ quiz       ${task.title} | guid: ${task.taskGuid}`);
   for (let i = 0; i < answers.length; i++) {
-    const { idx, text } = answers[i];
-    const r = await doTask(token, task.taskGuid, [idx, text]);
-    log(`    ${icon(r.state)} Q${String(i+1).padStart(2,"0")} [${idx}] → ${text.slice(0,45)} | ${JSON.stringify(r)}`);
+    const { text } = answers[i];
+    const r = await doTask(token, task.taskGuid, [String(i)]);
+    log(`    ${icon(r.state)} Q${String(i+1).padStart(2,"0")} → ${text.slice(0,45)} | ${JSON.stringify(r)}`);
     await sleep(1000);
   }
 }
