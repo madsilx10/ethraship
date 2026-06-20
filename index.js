@@ -125,8 +125,7 @@ async function runQuestionnaire(token, task, answers) {
   for (let i = 0; i < answers.length; i++) {
     const { idx, text } = answers[i];
     const r = await doTask(token, task.taskGuid, [idx, text]);
-    log(`    ${icon(r.state)} Q${String(i+1).padStart(2,"0")} [${idx}] → ${text.slice(0,45)}`);
-    if (r.error) log(`       ↳ ${r.error} | raw: ${JSON.stringify(r)}`);
+    log(`    ${icon(r.state)} Q${String(i+1).padStart(2,"0")} [${idx}] → ${text.slice(0,45)} | ${JSON.stringify(r)}`);
     await sleep(1000);
   }
 }
