@@ -29,7 +29,7 @@ function loadAnswers() {
   const raw = fs.readFileSync("answers.txt", "utf-8").replace(/\r/g, "");
   return raw.split(/\n\s*\n/).map(block =>
     block.split("\n").map(l => l.trim()).filter(l => l && !l.startsWith("#"))
-    .map(l => { const [idx, ...rest] = l.split(","); return { idx: idx.trim(), text: rest.join(",").trim() }; })
+    .map(l => ({ text: l }))
   ).filter(g => g.length > 0);
 }
 
