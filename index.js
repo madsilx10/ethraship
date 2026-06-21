@@ -157,8 +157,9 @@ async function connectTwitter(token, xtoken, w) {
       body: `approval=true&code=${initRes.auth_code || ""}&client_id=${client_id}&redirect_uri=${encodeURIComponent(redirect_uri)}&response_type=code&state=${state}&code_challenge=${code_challenge}&code_challenge_method=plain`
     }).then(r => r.json());
 
+    log(`${w} Approve response: ${JSON.stringify(approveRes).slice(0,300)}`);
     if (!approveRes.redirect_uri) {
-      log(`${w} ❌ Connect X: gagal approve (${JSON.stringify(approveRes).slice(0,100)})`);
+      log(`${w} ❌ Connect X: gagal approve`);
       return false;
     }
 
