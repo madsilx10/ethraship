@@ -143,7 +143,7 @@ async function connectTwitter(token, xtoken, w) {
   });
 
   log(`${w} Init response: ${JSON.stringify(initRes).slice(0,300)}`);
-  if (!initRes.auth_code) {
+  if (initRes.auth_code) {
     // Step 3: POST approve
     const approveRes = await fetch("https://x.com/i/api/2/oauth2/authorize", {
       method: "POST",
@@ -181,6 +181,8 @@ async function connectTwitter(token, xtoken, w) {
       log(`${w} ✅ Connect X: ${xtoken.username}`);
       return true;
     }
+    log(`${w} ❌ Connect X: callback gagal — ${JSON.stringify(cbRes).slice(0,200)}`);
+    return false;
   }
 
   log(`${w} ❌ Connect X gagal`);
