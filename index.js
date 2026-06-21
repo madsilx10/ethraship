@@ -142,6 +142,7 @@ async function connectTwitter(token, xtoken, w) {
     try { return JSON.parse(text); } catch { throw new Error(`Init authorize bukan JSON: ${text.slice(0,100)}`); }
   });
 
+  log(`${w} Init response: ${JSON.stringify(initRes).slice(0,300)}`);
   if (!initRes.auth_code) {
     // Step 3: POST approve
     const approveRes = await fetch("https://x.com/i/api/2/oauth2/authorize", {
