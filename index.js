@@ -250,13 +250,12 @@ const COMMENTS = [
   "Interesting take on maritime logistics",
   "Ethra is onto something big here",
 ];
-const COMMENT_TEXT = COMMENTS[Math.floor(Math.random() * COMMENTS.length)];
+const randomComment = () => COMMENTS[Math.floor(Math.random() * COMMENTS.length)];
 
 // ============ TASKS ============
 async function getTasks(token) {
   const r = await fetch(`${BASE_URL}/challenges/ethra-portal/tasks-status/2`, { headers: apiHeaders(token) }).then(r => r.json());
   const tasks = r.tasksStatus || [];
-  log(`   Raw tasks: ${tasks.length}, quiz: ${tasks.filter(t=>t.taskName==='questionnaire').length}`);
   return tasks;
 }
 
@@ -301,19 +300,15 @@ async function runCreateMedia(token, task, xtoken, w) {
     log(`${w} ✅ ${task.title}`);
     return;
   }
+  if (!xtoken) {
+    log(`${w} - ${task.title} (no X token)`);
+    return;
+  }
   try {
-    // Coba kirim link EthraShip post langsung dulu
-    const link = `https://x.com/EthraShip/status/${ETHRA_TWEET_ID}`;
-    const r = await doTask(token, task.taskGuid, [link]);
+    const tweetLink = await tweetComment(xtoken, ETHRA_TWEET_ID, randomComment());
+    const r = await doTask(token, task.taskGuid, [tweetLink]);
     const pts = r.points ? ` (${parseFloat(r.points).toFixed(0)}p)` : '';
     log(`${w} ${icon(r.state)} ${task.title}${pts}`);
-    if (r.state === "ERROR" && xtoken) {
-      // Fallback: auto tweet
-      const tweetLink = await tweetComment(xtoken, ETHRA_TWEET_ID, COMMENT_TEXT);
-      const r2 = await doTask(token, task.taskGuid, [tweetLink]);
-      const pts2 = r2.points ? ` (${parseFloat(r2.points).toFixed(0)}p)` : '';
-      log(`${w} ${icon(r2.state)} ${task.title} (tweet)${pts2}`);
-    }
   } catch (e) {
     log(`${w} ❌ ${task.title}: ${e.message}`);
   }
@@ -353,6 +348,7 @@ async function runWallet(privateKey, answers, idx, xTokens = []) {
   log(`${w} ${done}/${tasks.length} task selesai`);
 
   const xtoken = xTokens.length > 0 ? xTokens[idx % xTokens.length] : null;
+  if (!xtoken) log(`${w} ⚠️ xtoken.txt kosong — task X akan diskip`);
   let quizIdx = 0;
   for (const task of tasks) {
     try {
@@ -391,7 +387,6 @@ async function main() {
   const wallets = loadWallets();
   const answers = loadAnswers();
   const xTokens = loadXTokens();
-  log(`   Answers loaded: ${answers.length} quiz`);
   let selected = [];
 
   if (choice === "1") {
