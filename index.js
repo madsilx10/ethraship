@@ -192,7 +192,8 @@ function xHeaders(xtoken) {
 }
 
 async function tweetComment(xtoken, tweetId, text) {
-  const r = await fetch("https://x.com/i/api/graphql/a1p9RnpnsL1uzlyJda6Akg/CreateTweet", {
+  const QUERY_ID = "SoVnbfCycZ7fERGCwpZkYA";
+  const r = await fetch(`https://x.com/i/api/graphql/${QUERY_ID}/CreateTweet`, {
     method: "POST",
     headers: xHeaders(xtoken),
     body: JSON.stringify({
@@ -211,28 +212,28 @@ async function tweetComment(xtoken, tweetId, text) {
         longform_notetweets_consumption_enabled: true,
         responsive_web_twitter_article_tweet_consumption_enabled: false,
         tweet_awards_web_tipping_enabled: false,
-        freedom_of_speech_not_reach_the_voters_enabled: true,
-        standardized_nudges_misinfo: true,
-        tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled: true,
         longform_notetweets_rich_text_read_enabled: true,
         longform_notetweets_inline_media_enabled: true,
         responsive_web_graphql_exclude_directive_enabled: true,
         verified_phone_label_enabled: false,
-        freedom_of_speech_not_reach_the_voters_enabled: true,
+        freedom_of_speech_not_reach_fetch_enabled: true,
+        standardized_nudges_misinfo: true,
+        tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled: true,
         responsive_web_graphql_skip_user_profile_image_extensions_enabled: false,
         responsive_web_graphql_timeline_navigation_enabled: true,
+        interactive_text_enabled: true,
+        responsive_web_text_conversations_enabled: false,
         responsive_web_enhance_cards_enabled: false,
       },
-      queryId: "a1p9RnpnsL1uzlyJda6Akg",
+      queryId: QUERY_ID,
     }),
   }).then(r => r.json());
 
-  const tweetResult = r?.data?.create_tweet?.tweet_results?.result;
-  if (!tweetResult) throw new Error(`Tweet gagal: ${JSON.stringify(r).slice(0,200)}`);
-  
-  const newTweetId = tweetResult.rest_id;
-  const username = tweetResult.core?.user_results?.result?.legacy?.screen_name;
-  return `https://x.com/${username}/status/${newTweetId}`;
+  if (!r?.data?.create_tweet) throw new Error(`Tweet gagal: ${JSON.stringify(r).slice(0,200)}`);
+  const result = r.data.create_tweet.tweet_results.result;
+  const newTweetId = result.rest_id;
+  const username = result.core?.user_results?.result?.legacy?.screen_name;
+  return `https://twitter.com/${username}/status/${newTweetId}`;
 }
 
 // Tweet ID dari post EthraShip yang perlu di-komen
@@ -300,15 +301,19 @@ async function runCreateMedia(token, task, xtoken, w) {
     log(`${w} ✅ ${task.title}`);
     return;
   }
-  if (!xtoken) {
-    log(`${w} - ${task.title} (no X token)`);
-    return;
-  }
   try {
-    const link = await tweetComment(xtoken, ETHRA_TWEET_ID, COMMENT_TEXT);
+    // Coba kirim link EthraShip post langsung dulu
+    const link = `https://x.com/EthraShip/status/${ETHRA_TWEET_ID}`;
     const r = await doTask(token, task.taskGuid, [link]);
     const pts = r.points ? ` (${parseFloat(r.points).toFixed(0)}p)` : '';
     log(`${w} ${icon(r.state)} ${task.title}${pts}`);
+    if (r.state === "ERROR" && xtoken) {
+      // Fallback: auto tweet
+      const tweetLink = await tweetComment(xtoken, ETHRA_TWEET_ID, COMMENT_TEXT);
+      const r2 = await doTask(token, task.taskGuid, [tweetLink]);
+      const pts2 = r2.points ? ` (${parseFloat(r2.points).toFixed(0)}p)` : '';
+      log(`${w} ${icon(r2.state)} ${task.title} (tweet)${pts2}`);
+    }
   } catch (e) {
     log(`${w} ❌ ${task.title}: ${e.message}`);
   }
