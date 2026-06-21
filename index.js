@@ -87,6 +87,170 @@ async function createReferral(token) {
   });
 }
 
+
+// ============ CONNECT X ============
+function loadXTokens() {
+  try {
+    const raw = fs.readFileSync("xtoken.txt", "utf-8").replace(/\r/g, "");
+    return raw.split(/\n\s*\n/).map(block => {
+      const lines = block.trim().split("\n").map(l => l.trim());
+      return { username: lines[0], auth_token: lines[1], ct0: lines[2] };
+    }).filter(t => t.auth_token && t.ct0);
+  } catch { return []; }
+}
+
+async function connectTwitter(token, xtoken, w) {
+  // Step 1: Register twitter - dapet OAuth params
+  const reg = await fetch(`${BASE_URL}/social-pay/register/twitter`, {
+    method: "POST", headers: apiHeaders(token),
+    body: JSON.stringify({ type: "register", redirectUrl: "https://app.ethraship.io/" }),
+  }).then(r => r.json());
+
+  if (!reg.authUrl) {
+    log(`${w} ❌ Connect X: gagal dapet authUrl`);
+    return false;
+  }
+
+  const url = new URL(reg.authUrl);
+  const client_id = url.searchParams.get("client_id");
+  const code_challenge = url.searchParams.get("code_challenge");
+  const state = url.searchParams.get("state");
+  const redirect_uri = url.searchParams.get("redirect_uri");
+  const scope = url.searchParams.get("scope");
+
+  // Step 2: GET authorize page (init session)
+  const authUrl = `https://x.com/i/api/2/oauth2/authorize?client_id=${client_id}&code_challenge=${code_challenge}&code_challenge_method=plain&redirect_uri=${encodeURIComponent(redirect_uri)}&response_type=code&scope=${encodeURIComponent(scope)}&state=${state}`;
+  
+  const initRes = await fetch(authUrl, {
+    headers: {
+      "Authorization": `Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA`,
+      "Cookie": `auth_token=${xtoken.auth_token}; ct0=${xtoken.ct0}`,
+      "X-Csrf-Token": xtoken.ct0,
+      "X-Twitter-Auth-Type": "OAuth2Session",
+      "X-Twitter-Active-User": "yes",
+      "X-Twitter-Client-Language": "en",
+    }
+  }).then(r => r.json());
+
+  if (!initRes.auth_code) {
+    // Step 3: POST approve
+    const approveRes = await fetch("https://x.com/i/api/2/oauth2/authorize", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA`,
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": `auth_token=${xtoken.auth_token}; ct0=${xtoken.ct0}`,
+        "X-Csrf-Token": xtoken.ct0,
+        "X-Twitter-Auth-Type": "OAuth2Session",
+        "X-Twitter-Active-User": "yes",
+      },
+      body: `approval=true&code=${initRes.auth_code || ""}&client_id=${client_id}&redirect_uri=${encodeURIComponent(redirect_uri)}&response_type=code&state=${state}&code_challenge=${code_challenge}&code_challenge_method=plain`
+    }).then(r => r.json());
+
+    if (!approveRes.redirect_uri) {
+      log(`${w} ❌ Connect X: gagal approve (${JSON.stringify(approveRes).slice(0,100)})`);
+      return false;
+    }
+
+    const code = new URL(approveRes.redirect_uri).searchParams.get("code");
+    
+    // Step 4: Callback ke EthraShip
+    const cbRes = await fetch(`${BASE_URL}/social-pay/register/twitter/callback?code=${code}&state=${state}`, {
+      headers: apiHeaders(token),
+    }).then(r => r.json());
+
+    if (cbRes.refresh_token) {
+      // Step 5: Update Privy session
+      await fetch(`${PRIVY_URL}/api/v1/sessions`, {
+        method: "POST",
+        headers: { ...privyHeaders(), "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({ refresh_token: cbRes.refresh_token }),
+      });
+      log(`${w} ✅ Connect X: ${xtoken.username}`);
+      return true;
+    }
+  }
+
+  log(`${w} ❌ Connect X gagal`);
+  return false;
+}
+
+
+const X_BEARER = "AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA";
+
+function xHeaders(xtoken) {
+  return {
+    "Authorization": `Bearer ${X_BEARER}`,
+    "Cookie": `auth_token=${xtoken.auth_token}; ct0=${xtoken.ct0}`,
+    "X-Csrf-Token": xtoken.ct0,
+    "X-Twitter-Active-User": "yes",
+    "X-Twitter-Auth-Type": "OAuth2Session",
+    "X-Twitter-Client-Language": "en",
+    "Content-Type": "application/json",
+    "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+  };
+}
+
+async function tweetComment(xtoken, tweetId, text) {
+  const r = await fetch("https://x.com/i/api/graphql/a1p9RnpnsL1uzlyJda6Akg/CreateTweet", {
+    method: "POST",
+    headers: xHeaders(xtoken),
+    body: JSON.stringify({
+      variables: {
+        tweet_text: text,
+        reply: { in_reply_to_tweet_id: tweetId, exclude_reply_user_ids: [] },
+        dark_request: false,
+        media: { media_entities: [], possibly_sensitive: false },
+        semantic_annotation_ids: [],
+      },
+      features: {
+        tweetypie_unmention_optimization_enabled: true,
+        responsive_web_edit_tweet_api_enabled: true,
+        graphql_is_translatable_rweb_tweet_is_translatable_enabled: true,
+        view_counts_everywhere_api_enabled: true,
+        longform_notetweets_consumption_enabled: true,
+        responsive_web_twitter_article_tweet_consumption_enabled: false,
+        tweet_awards_web_tipping_enabled: false,
+        freedom_of_speech_not_reach_the_voters_enabled: true,
+        standardized_nudges_misinfo: true,
+        tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled: true,
+        longform_notetweets_rich_text_read_enabled: true,
+        longform_notetweets_inline_media_enabled: true,
+        responsive_web_graphql_exclude_directive_enabled: true,
+        verified_phone_label_enabled: false,
+        freedom_of_speech_not_reach_the_voters_enabled: true,
+        responsive_web_graphql_skip_user_profile_image_extensions_enabled: false,
+        responsive_web_graphql_timeline_navigation_enabled: true,
+        responsive_web_enhance_cards_enabled: false,
+      },
+      queryId: "a1p9RnpnsL1uzlyJda6Akg",
+    }),
+  }).then(r => r.json());
+
+  const tweetResult = r?.data?.create_tweet?.tweet_results?.result;
+  if (!tweetResult) throw new Error(`Tweet gagal: ${JSON.stringify(r).slice(0,200)}`);
+  
+  const newTweetId = tweetResult.rest_id;
+  const username = tweetResult.core?.user_results?.result?.legacy?.screen_name;
+  return `https://x.com/${username}/status/${newTweetId}`;
+}
+
+// Tweet ID dari post EthraShip yang perlu di-komen
+const ETHRA_TWEET_ID = "2050222589084119221";
+const COMMENTS = [
+  "This is the future of maritime investing 🚢",
+  "Finally, real maritime assets on-chain",
+  "Maritime RWA is a game changer",
+  "Love what Ethra is building here",
+  "Solid project, maritime + blockchain makes sense",
+  "Been waiting for something like this",
+  "Real world assets done right 🔥",
+  "This is what crypto should be about",
+  "Interesting take on maritime logistics",
+  "Ethra is onto something big here",
+];
+const COMMENT_TEXT = COMMENTS[Math.floor(Math.random() * COMMENTS.length)];
+
 // ============ TASKS ============
 async function getTasks(token) {
   const r = await fetch(`${BASE_URL}/challenges/ethra-portal/tasks-status/2`, { headers: apiHeaders(token) }).then(r => r.json());
@@ -130,8 +294,28 @@ async function runQuestionnaire(token, task, answers, w) {
   }
 }
 
+
+async function runCreateMedia(token, task, xtoken, w) {
+  if (task.status === "SUCCESSFUL") {
+    log(`${w} ✅ ${task.title}`);
+    return;
+  }
+  if (!xtoken) {
+    log(`${w} - ${task.title} (no X token)`);
+    return;
+  }
+  try {
+    const link = await tweetComment(xtoken, ETHRA_TWEET_ID, COMMENT_TEXT);
+    const r = await doTask(token, task.taskGuid, [link]);
+    const pts = r.points ? ` (${parseFloat(r.points).toFixed(0)}p)` : '';
+    log(`${w} ${icon(r.state)} ${task.title}${pts}`);
+  } catch (e) {
+    log(`${w} ❌ ${task.title}: ${e.message}`);
+  }
+}
+
 // ============ MAIN RUNNER ============
-async function runWallet(privateKey, answers, idx) {
+async function runWallet(privateKey, answers, idx, xTokens = []) {
   const wallet = new ethers.Wallet(privateKey);
   const w = `[Wallet ${idx+1}]`;
   log(`\n${w} Mulai...`);
@@ -142,6 +326,11 @@ async function runWallet(privateKey, answers, idx) {
     token = await login(wallet);
     try { await createReferral(token); } catch (_) {}
     log(`${w} ✅ Login OK`);
+    // Connect X
+    if (xTokens.length > 0) {
+      const xtmp = xTokens[idx % xTokens.length];
+      try { await connectTwitter(token, xtmp, w); } catch (e) { log(`${w} ❌ Connect X error: ${e.message}`); }
+    }
   } catch (e) {
     log(`${w} ❌ Login gagal: ${e.message}`);
     return;
@@ -158,6 +347,7 @@ async function runWallet(privateKey, answers, idx) {
   const done = tasks.filter(t => t.status === "SUCCESSFUL").length;
   log(`${w} ${done}/${tasks.length} task selesai`);
 
+  const xtoken = xTokens.length > 0 ? xTokens[idx % xTokens.length] : null;
   let quizIdx = 0;
   for (const task of tasks) {
     try {
@@ -165,6 +355,12 @@ async function runWallet(privateKey, answers, idx) {
         await runSimpleTask(token, task, w);
       } else if (task.taskName === "retweet_post") {
         await runSimpleTask(token, task, w);
+      } else if (task.taskName === "follow_twitter_account") {
+        await runSimpleTask(token, task, w);
+      } else if (task.taskName === "twitter_username") {
+        await runSimpleTask(token, task, w);
+      } else if (task.taskName === "create_media") {
+        await runCreateMedia(token, task, xtoken, w);
       } else if (task.taskName === "questionnaire") {
         await runQuestionnaire(token, task, answers[quizIdx], w);
         quizIdx++;
@@ -189,6 +385,7 @@ async function main() {
   const choice = await prompt("Pilih: ");
   const wallets = loadWallets();
   const answers = loadAnswers();
+  const xTokens = loadXTokens();
   log(`   Answers loaded: ${answers.length} quiz`);
   let selected = [];
 
@@ -208,7 +405,7 @@ async function main() {
   log(`\n  Total: ${selected.length} wallet\n`);
 
   for (let i = 0; i < selected.length; i++) {
-    await runWallet(selected[i].key, answers, selected[i].idx);
+    await runWallet(selected[i].key, answers, selected[i].idx, xTokens);
     if (i < selected.length - 1) await sleep(3000);
   }
 
