@@ -145,7 +145,7 @@ async function connectTwitter(token, xtoken, w) {
   log(`${w} Init response: ${JSON.stringify(initRes).slice(0,300)}`);
   if (initRes.auth_code) {
     // Step 3: POST approve
-    const approveRaw = await fetch("https://x.com/i/api/2/oauth2/authorize", {
+    const approveRaw = await fetch("https://api.x.com/2/oauth2/authorize", {
       method: "POST",
       headers: {
         "Authorization": `Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA`,
