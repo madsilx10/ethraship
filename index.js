@@ -145,7 +145,7 @@ async function connectTwitter(token, xtoken, w) {
   log(`${w} Init response: ${JSON.stringify(initRes).slice(0,300)}`);
   if (initRes.auth_code) {
     // Step 3: POST approve
-    const approveRes = await fetch("https://x.com/i/api/2/oauth2/authorize", {
+    const approveRaw = await fetch("https://x.com/i/api/2/oauth2/authorize", {
       method: "POST",
       headers: {
         "Authorization": `Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA`,
@@ -156,7 +156,14 @@ async function connectTwitter(token, xtoken, w) {
         "X-Twitter-Active-User": "yes",
       },
       body: `approval=true&code=${initRes.auth_code || ""}&client_id=${client_id}&redirect_uri=${encodeURIComponent(redirect_uri)}&response_type=code&state=${state}&code_challenge=${code_challenge}&code_challenge_method=plain`
-    }).then(r => r.json());
+    });
+    const approveText = await approveRaw.text();
+    let approveRes;
+    try { approveRes = JSON.parse(approveText); }
+    catch {
+      log(`${w} ❌ Connect X: approve bukan JSON (status ${approveRaw.status}) — kemungkinan auth_token/ct0 expired. Body: ${approveText.slice(0,150)}`);
+      return false;
+    }
 
     log(`${w} Approve response: ${JSON.stringify(approveRes).slice(0,300)}`);
     if (!approveRes.redirect_uri) {
