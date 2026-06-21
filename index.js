@@ -133,8 +133,14 @@ async function connectTwitter(token, xtoken, w) {
       "X-Twitter-Auth-Type": "OAuth2Session",
       "X-Twitter-Active-User": "yes",
       "X-Twitter-Client-Language": "en",
+      "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+      "Accept": "application/json",
+      "Referer": "https://x.com/",
     }
-  }).then(r => r.json());
+  }).then(async r => {
+    const text = await r.text();
+    try { return JSON.parse(text); } catch { throw new Error(`Init authorize bukan JSON: ${text.slice(0,100)}`); }
+  });
 
   if (!initRes.auth_code) {
     // Step 3: POST approve
