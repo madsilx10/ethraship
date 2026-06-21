@@ -101,10 +101,14 @@ function loadXTokens() {
 
 async function connectTwitter(token, xtoken, w) {
   // Step 1: Register twitter - dapet OAuth params
-  const reg = await fetch(`${BASE_URL}/social-pay/register/twitter`, {
+  const regRaw = await fetch(`${BASE_URL}/social-pay/register/twitter`, {
     method: "POST", headers: apiHeaders(token),
     body: JSON.stringify({ type: "register", redirectUrl: "https://app.ethraship.io/" }),
-  }).then(r => r.json());
+  });
+  const regText = await regRaw.text();
+  let reg;
+  try { reg = JSON.parse(regText); } catch { reg = { authUrl: regText.trim() }; }
+  log(`${w} Register response: ${JSON.stringify(reg).slice(0,200)}`);
 
   if (!reg.authUrl) {
     log(`${w} ❌ Connect X: gagal dapet authUrl`);
