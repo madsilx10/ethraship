@@ -155,8 +155,11 @@ async function connectTwitter(token, xtoken, w) {
         "X-Twitter-Auth-Type": "OAuth2Session",
         "X-Twitter-Active-User": "yes",
       },
-      body: `approval=true&code=${initRes.auth_code || ""}&client_id=${client_id}&redirect_uri=${encodeURIComponent(redirect_uri)}&response_type=code&state=${state}&code_challenge=${code_challenge}&code_challenge_method=plain`
-    }).then(r => r.json());
+      body: `approval=true&code=${initRes.auth_code}&client_id=${client_id}&redirect_uri=${encodeURIComponent(redirect_uri)}&response_type=code&state=${state}&code_challenge=${code_challenge}&code_challenge_method=plain`
+    }).then(async r => {
+      const text = await r.text();
+      try { return JSON.parse(text); } catch { throw new Error(`Approve bukan JSON: ${text.slice(0,200)}`); }
+    });
 
     log(`${w} Approve response: ${JSON.stringify(approveRes).slice(0,300)}`);
     if (!approveRes.redirect_uri) {
