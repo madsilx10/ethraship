@@ -174,18 +174,13 @@ async function connectTwitter(token, xtoken, w) {
 
     const code = new URL(approveRes.redirect_uri).searchParams.get("code");
     
-    // Step 4: Callback ke EthraShip
-    const cbRes = await fetch(`${BASE_URL}/social-pay/register/twitter/callback?code=${code}&state=${state}`, {
-      headers: apiHeaders(token),
-    }).then(r => r.json());
-
-    if (cbRes.refresh_token) {
-      // Step 5: Update Privy session
-      await fetch(`${PRIVY_URL}/api/v1/sessions`, {
-        method: "POST",
-        headers: { ...privyHeaders(), "Authorization": `Bearer ${token}` },
-        body: JSON.stringify({ refresh_token: cbRes.refresh_token }),
-      });
+    // Step 4: Callback ke EthraShip - hit redirect_uri langsung
+    const callbackUrl = approveRes.redirect_uri;
+    const cbR = await fetch(callbackUrl, { headers: apiHeaders(token) });
+    const cbText = await cbR.text();
+    log(`${w} Callback status: ${cbR.status} | ${cbText.slice(0,200)}`);
+    
+    if (cbR.status === 200 || cbR.status === 201 || cbR.status === 302) {
       log(`${w} ✅ Connect X: ${xtoken.username}`);
       return true;
     }
