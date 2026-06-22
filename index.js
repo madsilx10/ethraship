@@ -154,6 +154,11 @@ async function connectTwitter(token, xtoken, w) {
         "X-Csrf-Token": xtoken.ct0,
         "X-Twitter-Auth-Type": "OAuth2Session",
         "X-Twitter-Active-User": "yes",
+        "X-Twitter-Client-Language": "en",
+        "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+        "Referer": authUrl,
+        "Origin": "https://x.com",
+        "Accept": "application/json, text/plain, */*",
       },
       body: `approval=true&code=${initRes.auth_code}&client_id=${client_id}&redirect_uri=${encodeURIComponent(redirect_uri)}&response_type=code&state=${state}&code_challenge=${code_challenge}&code_challenge_method=plain`
     }).then(async r => {
