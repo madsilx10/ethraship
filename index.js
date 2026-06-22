@@ -281,6 +281,36 @@ async function doTask(token, taskGuid, extraArguments = []) {
   }).then(r => r.json());
 }
 
+
+async function xFollow(xtoken, userId) {
+  const meRes = await fetch("https://api.twitter.com/1.1/account/verify_credentials.json", {
+    headers: { ...xHeaders(xtoken), "Content-Type": "application/json" }
+  }).then(r => r.json());
+  const myId = meRes.id_str;
+  if (!myId) throw new Error("Gagal dapet user ID");
+
+  await fetch(`https://api.twitter.com/1.1/friendships/create.json`, {
+    method: "POST",
+    headers: { ...xHeaders(xtoken), "Content-Type": "application/x-www-form-urlencoded" },
+    body: `user_id=${userId}&follow=true`,
+  });
+}
+
+async function xUpdateName(xtoken, name) {
+  await fetch("https://api.twitter.com/1.1/account/update_profile.json", {
+    method: "POST",
+    headers: { ...xHeaders(xtoken), "Content-Type": "application/x-www-form-urlencoded" },
+    body: `name=${encodeURIComponent(name)}`,
+  });
+}
+
+async function xGetUserByUsername(xtoken, username) {
+  const r = await fetch(`https://api.twitter.com/1.1/users/show.json?screen_name=${username}`, {
+    headers: xHeaders(xtoken),
+  }).then(r => r.json());
+  return r.id_str;
+}
+
 // ============ TASK RUNNERS ============
 async function runSimpleTask(token, task, w) {
   if (task.status === "SUCCESSFUL") {
@@ -310,7 +340,14 @@ async function runQuestionnaire(token, task, answers, w) {
 }
 
 
-async function runCreateMedia(token, task, xtoken, w) {
+function loadLinks() {
+  try { return JSON.parse(fs.readFileSync("links.json", "utf-8")); } catch { return {}; }
+}
+function saveLinks(links) {
+  fs.writeFileSync("links.json", JSON.stringify(links, null, 2));
+}
+
+async function runCreateMedia(token, task, xtoken, walletAddr, w) {
   if (task.status === "SUCCESSFUL") {
     log(`${w} ✅ ${task.title}`);
     return;
@@ -320,7 +357,13 @@ async function runCreateMedia(token, task, xtoken, w) {
     return;
   }
   try {
-    const tweetLink = await tweetComment(xtoken, ETHRA_TWEET_ID, randomComment());
+    const links = loadLinks();
+    let tweetLink = links[walletAddr];
+    if (!tweetLink) {
+      tweetLink = await tweetComment(xtoken, ETHRA_TWEET_ID, randomComment());
+      links[walletAddr] = tweetLink;
+      saveLinks(links);
+    }
     const r = await doTask(token, task.taskGuid, [tweetLink]);
     const pts = r.points ? ` (${parseFloat(r.points).toFixed(0)}p)` : '';
     log(`${w} ${icon(r.state)} ${task.title}${pts}`);
@@ -341,11 +384,6 @@ async function runWallet(privateKey, answers, idx, xTokens = []) {
     token = await login(wallet);
     try { await createReferral(token); } catch (_) {}
     log(`${w} ✅ Login OK`);
-    // Connect X
-    if (xTokens.length > 0) {
-      const xtmp = xTokens[idx % xTokens.length];
-      try { await connectTwitter(token, xtmp, w); } catch (e) { log(`${w} ❌ Connect X error: ${e.message}`); }
-    }
   } catch (e) {
     log(`${w} ❌ Login gagal: ${e.message}`);
     return;
@@ -357,6 +395,18 @@ async function runWallet(privateKey, answers, idx, xTokens = []) {
   } catch (e) {
     log(`${w} ❌ Fetch tasks gagal: ${e.message}`);
     return;
+  }
+
+  // Connect X - hanya kalau ada task X yang belum selesai
+  if (xTokens.length > 0) {
+    const needsX = tasks.some(t =>
+      ["follow_twitter_account", "twitter_username", "create_media", "retweet_post"].includes(t.taskName)
+      && t.status !== "SUCCESSFUL"
+    );
+    if (needsX) {
+      const xtmp = xTokens[idx % xTokens.length];
+      try { await connectTwitter(token, xtmp, w); } catch (e) { log(`${w} ❌ Connect X error: ${e.message}`); }
+    }
   }
 
   const done = tasks.filter(t => t.status === "SUCCESSFUL").length;
@@ -372,11 +422,35 @@ async function runWallet(privateKey, answers, idx, xTokens = []) {
       } else if (task.taskName === "retweet_post") {
         await runSimpleTask(token, task, w);
       } else if (task.taskName === "follow_twitter_account") {
-        await runSimpleTask(token, task, w);
+        if (task.status === "SUCCESSFUL") { log(`${w} ✅ ${task.title}`); }
+        else {
+          if (xtoken) {
+            try {
+              const targetUser = task.extraArguments?.[0] || "EthraShip";
+              const userId = await xGetUserByUsername(xtoken, targetUser.replace("@",""));
+              await xFollow(xtoken, userId);
+            } catch (e) { log(`${w} ⚠️ Follow Twitter gagal: ${e.message}`); }
+          }
+          await runSimpleTask(token, task, w);
+        }
       } else if (task.taskName === "twitter_username") {
-        await runSimpleTask(token, task, w);
+        if (task.status === "SUCCESSFUL") { log(`${w} ✅ ${task.title}`); }
+        else {
+          if (xtoken) {
+            try {
+              const meRes = await fetch("https://api.twitter.com/1.1/account/verify_credentials.json", {
+                headers: xHeaders(xtoken)
+              }).then(r => r.json());
+              const currentName = meRes.name || "";
+              if (!currentName.includes("🚢")) {
+                await xUpdateName(xtoken, currentName + " 🚢");
+              }
+            } catch (e) { log(`${w} ⚠️ Update nama gagal: ${e.message}`); }
+          }
+          await runSimpleTask(token, task, w);
+        }
       } else if (task.taskName === "create_media") {
-        await runCreateMedia(token, task, xtoken, w);
+        await runCreateMedia(token, task, xtoken, wallet.address, w);
       } else if (task.taskName === "questionnaire") {
         await runQuestionnaire(token, task, answers[quizIdx], w);
         quizIdx++;
