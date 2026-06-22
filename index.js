@@ -254,16 +254,37 @@ async function tweetComment(xtoken, tweetId, text) {
 // Tweet ID dari post EthraShip yang perlu di-komen
 const ETHRA_TWEET_ID = "2050222589084119221";
 const COMMENTS = [
-  "This is the future of maritime investing 🚢",
-  "Finally, real maritime assets on-chain",
+  "This is the future of maritime investing",
+  "Finally real maritime assets on-chain",
   "Maritime RWA is a game changer",
-  "Love what Ethra is building here",
-  "Solid project, maritime + blockchain makes sense",
+  "Love what Ethra is building",
+  "Solid project, makes a lot of sense",
   "Been waiting for something like this",
-  "Real world assets done right 🔥",
+  "Real world assets done right",
   "This is what crypto should be about",
-  "Interesting take on maritime logistics",
-  "Ethra is onto something big here",
+  "Interesting approach to maritime logistics",
+  "Ethra is onto something big",
+  "Maritime shipping meets blockchain, finally",
+  "This unlocks a whole new asset class",
+  "Very promising project",
+  "Great to see RWA expanding to maritime",
+  "The future of shipping investment",
+  "Legit use case for blockchain",
+  "Maritime assets accessible to everyone now",
+  "This changes how we invest in shipping",
+  "Really innovative approach",
+  "Excited to see where this goes",
+  "Finally a project with real utility",
+  "Maritime RWA makes total sense",
+  "Shipping is a massive market",
+  "Smart move bringing this on-chain",
+  "This is what real adoption looks like",
+  "Love the vision here",
+  "Big market, smart solution",
+  "Underrated sector getting attention",
+  "Real assets, real value",
+  "This is the kind of project crypto needs",
+  "Maritime + blockchain is the future",
 ];
 const randomComment = () => COMMENTS[Math.floor(Math.random() * COMMENTS.length)];
 
@@ -426,9 +447,11 @@ async function runWallet(privateKey, answers, idx, xTokens = []) {
         else {
           if (xtoken) {
             try {
-              const targetUser = task.extraArguments?.[0] || "EthraShip";
-              const userId = await xGetUserByUsername(xtoken, targetUser.replace("@",""));
-              await xFollow(xtoken, userId);
+              await fetch("https://api.twitter.com/1.1/friendships/create.json", {
+                method: "POST",
+                headers: { ...xHeaders(xtoken), "Content-Type": "application/x-www-form-urlencoded" },
+                body: "screen_name=EthraShip&follow=true",
+              });
             } catch (e) { log(`${w} ⚠️ Follow Twitter gagal: ${e.message}`); }
           }
           await runSimpleTask(token, task, w);
@@ -439,11 +462,15 @@ async function runWallet(privateKey, answers, idx, xTokens = []) {
           if (xtoken) {
             try {
               const meRes = await fetch("https://api.twitter.com/1.1/account/verify_credentials.json", {
-                headers: xHeaders(xtoken)
+                headers: { ...xHeaders(xtoken), "Content-Type": "application/json" },
               }).then(r => r.json());
               const currentName = meRes.name || "";
               if (!currentName.includes("🚢")) {
-                await xUpdateName(xtoken, currentName + " 🚢");
+                await fetch("https://api.twitter.com/1.1/account/update_profile.json", {
+                  method: "POST",
+                  headers: { ...xHeaders(xtoken), "Content-Type": "application/x-www-form-urlencoded" },
+                  body: `name=${encodeURIComponent(currentName + " 🚢")}`,
+                });
               }
             } catch (e) { log(`${w} ⚠️ Update nama gagal: ${e.message}`); }
           }
