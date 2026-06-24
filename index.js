@@ -249,7 +249,8 @@ async function tweetComment(xtoken, tweetId, text) {
   });
 
   if (!r?.data?.create_tweet) throw new Error(`Tweet gagal: ${JSON.stringify(r).slice(0, 200)}`);
-  const result = r.data.create_tweet.tweet_results.result;
+  const result = r.data.create_tweet.tweet_results?.result;
+  if (!result?.rest_id) throw new Error(`Tweet gagal, tweet_results kosong: ${JSON.stringify(r.data).slice(0, 200)}`);
   const newTweetId = result.rest_id;
   const username = result.core?.user_results?.result?.legacy?.screen_name;
   return `https://twitter.com/${username}/status/${newTweetId}`;
@@ -466,10 +467,11 @@ async function runWallet(privateKey, answers, idx, xTokens = []) {
         else {
           if (xtoken) {
             try {
-              const meRes = await fetch("https://x.com/i/api/1.1/account/verify_credentials.json", {
-                headers: { ...xHeaders(xtoken), "Content-Type": "application/json" },
-              }).then(r => r.json());
-              const currentName = meRes.name || "";
+              const meRes = await fetch("https://x.com/i/api/graphql/G3KGOASz96M-Qu0nwmGXNg/UserByScreenName?" + new URLSearchParams({
+                variables: JSON.stringify({ screen_name: xtoken.username, withSafetyModeUserFields: true }),
+                features: JSON.stringify({ responsive_web_graphql_exclude_directive_enabled: true, verified_phone_label_enabled: false, responsive_web_graphql_skip_user_profile_image_extensions_enabled: false, responsive_web_graphql_timeline_navigation_enabled: true }),
+              }), { headers: xHeaders(xtoken) }).then(r => r.json());
+              const currentName = meRes?.data?.user?.result?.legacy?.name || "";
               log(`${w} Nama saat ini: "${currentName}"`);
               if (!currentName.includes("🚢")) {
                 const upRes = await fetch("https://x.com/i/api/1.1/account/update_profile.json", {
