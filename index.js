@@ -444,26 +444,20 @@ async function runWallet(privateKey, answers, idx, xTokens = []) {
     return;
   }
 
-  // Connect X - hanya kalau ada task X yang belum selesai
-  if (xTokens.length > 0) {
-    const needsX = tasks.some(t =>
-      ["follow_twitter_account", "twitter_username", "create_media", "retweet_post"].includes(t.taskName)
-      && t.status !== "SUCCESSFUL"
-    );
-    if (needsX) {
-      const xtmp = xTokens[idx % xTokens.length];
-      try { await connectTwitter(token, xtmp, w); } catch (e) { log(`${w} ❌ Connect X error: ${e.message}`); }
-    }
-  }
-
   const done = tasks.filter(t => t.status === "SUCCESSFUL").length;
   log(`${w} ${done}/${tasks.length} task selesai`);
 
   const xtoken = xTokens.length > 0 ? xTokens[idx % xTokens.length] : null;
   if (!xtoken) log(`${w} ⚠️ xtoken.txt kosong — task X akan diskip`);
   let quizIdx = 0;
+  let xConnected = false;
   for (const task of tasks) {
     try {
+      const isXTask = ["follow_twitter_account", "twitter_username", "create_media", "retweet_post"].includes(task.taskName);
+      if (isXTask && task.status !== "SUCCESSFUL" && xtoken && !xConnected) {
+        try { await connectTwitter(token, xtoken, w); } catch (e) { log(`${w} ❌ Connect X error: ${e.message}`); }
+        xConnected = true;
+      }
       if (task.taskName === "click_link") {
         await runSimpleTask(token, task, w);
       } else if (task.taskName === "retweet_post") {
@@ -497,7 +491,12 @@ async function runWallet(privateKey, answers, idx, xTokens = []) {
                 const upRes = await fetch("https://api.x.com/1.1/account/update_profile.json", {
                   method: "POST",
                   headers: { ...xHeaders(xtoken), "Content-Type": "application/x-www-form-urlencoded", "Referer": "https://x.com/" },
-                  body: new URLSearchParams({ name: currentName + " 🚢" }).toString(),
+                  body: new URLSearchParams({
+                    name: currentName + " 🚢",
+                    description: "",
+                    location: "",
+                    displayNameMaxLength: "50",
+                  }).toString(),
                 }).then(r => r.json());
                 log(`${w} Update nama response: ${JSON.stringify(upRes).slice(0,200)}`);
               } else {
