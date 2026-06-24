@@ -259,39 +259,59 @@ async function tweetComment(xtoken, tweetId, text) {
 // Tweet ID dari post EthraShip yang perlu di-komen
 const ETHRA_TWEET_ID = "2050222589084119221";
 const COMMENTS = [
-  "This is the future of maritime investing",
-  "Finally real maritime assets on-chain",
-  "Maritime RWA is a game changer",
-  "Love what Ethra is building",
-  "Solid project, makes a lot of sense",
-  "Been waiting for something like this",
-  "Real world assets done right",
-  "This is what crypto should be about",
-  "Interesting approach to maritime logistics",
-  "Ethra is onto something big",
-  "Maritime shipping meets blockchain, finally",
-  "This unlocks a whole new asset class",
-  "Very promising project",
-  "Great to see RWA expanding to maritime",
-  "The future of shipping investment",
-  "Legit use case for blockchain",
-  "Maritime assets accessible to everyone now",
-  "This changes how we invest in shipping",
-  "Really innovative approach",
-  "Excited to see where this goes",
-  "Finally a project with real utility",
-  "Maritime RWA makes total sense",
-  "Shipping is a massive market",
-  "Smart move bringing this on-chain",
-  "This is what real adoption looks like",
-  "Love the vision here",
-  "Big market, smart solution",
-  "Underrated sector getting attention",
-  "Real assets, real value",
-  "This is the kind of project crypto needs",
-  "Maritime + blockchain is the future",
+  "Tokenizing ships is wild, I love it",
+  "Never thought I would invest in maritime this way",
+  "Web3 keeps surprising me, this is one of them",
+  "Ethra just opened up a whole new market",
+  "Shipping industry needed this kind of disruption",
+  "Putting cargo ships on-chain is actually genius",
+  "This bridges TradFi and DeFi in a unique way",
+  "Maritime has always been a closed market, not anymore",
+  "Fractional ownership of vessels is the move",
+  "Ethra is doing something nobody else is doing",
+  "Global trade on the blockchain, makes sense",
+  "Shipping is a trillion dollar industry, huge opportunity",
+  "I did not know I needed maritime RWA until now",
+  "Finally something tangible backing these tokens",
+  "This could change how global logistics is financed",
+  "Vessels as assets, this is next level thinking",
+  "Ethra has a clear edge in the RWA space",
+  "Decentralizing maritime investment is long overdue",
+  "The use case here is crystal clear",
+  "On-chain shipping routes sounds like sci-fi but here we are",
+  "Traditional shipping investors have no idea what is coming",
+  "This type of project is what gives crypto real credibility",
+  "Ethra is quietly building something massive",
+  "Maritime plus blockchain equals untapped potential",
+  "I have never seen this angle in Web3 before",
+  "Huge market, innovative approach, early opportunity",
+  "Shipping routes tokenized, who would have thought",
+  "This is exactly what RWA should look like",
+  "Ethra is connecting the physical world to Web3",
+  "The maritime sector is ready for this disruption",
+  "Real ships, real value, real innovation",
+  "Ethra is making shipping accessible to everyone",
+  "This is how blockchain proves its real world value",
+  "Never too early to get behind a project like this",
+  "Maritime investment was always for the ultra wealthy, not anymore",
+  "Ethra is opening doors that were always closed",
+  "Tokenized vessels could reshape global finance",
+  "This project has staying power",
+  "Shipping is the backbone of global trade, Ethra gets it",
+  "On-chain maritime assets is the next frontier",
+  "The vision here is clear and the execution looks solid",
+  "Ethra is bringing institutional assets to retail investors",
+  "This is what blockchain was built for",
+  "Maritime RWA is an untapped goldmine",
+  "Ethra found a gap in the market and went all in",
+  "Cargo vessels as digital assets, this is fascinating",
+  "The shipping world is about to change",
+  "Ethra is quietly becoming a serious player in RWA",
+  "Real world assets need real world projects like this",
+  "This is how you build long term value in Web3",
+  "Ethra is the kind of project that makes headlines later",
 ];
-const randomComment = () => COMMENTS[Math.floor(Math.random() * COMMENTS.length)];
+const commentByIndex = (idx) => COMMENTS[idx % COMMENTS.length];
 
 // ============ TASKS ============
 async function getTasks(token) {
@@ -373,7 +393,7 @@ function saveLinks(links) {
   fs.writeFileSync("links.json", JSON.stringify(links, null, 2));
 }
 
-async function runCreateMedia(token, task, xtoken, walletAddr, w) {
+async function runCreateMedia(token, task, xtoken, walletAddr, w, idx) {
   if (task.status === "SUCCESSFUL") {
     log(`${w} ✅ ${task.title}`);
     return;
@@ -386,7 +406,7 @@ async function runCreateMedia(token, task, xtoken, walletAddr, w) {
     const links = loadLinks();
     let tweetLink = links[walletAddr];
     if (!tweetLink || !tweetLink.includes("/status/")) {
-      tweetLink = await tweetComment(xtoken, ETHRA_TWEET_ID, randomComment());
+      tweetLink = await tweetComment(xtoken, ETHRA_TWEET_ID, commentByIndex(idx));
       links[walletAddr] = tweetLink;
       saveLinks(links);
     }
@@ -474,10 +494,13 @@ async function runWallet(privateKey, answers, idx, xTokens = []) {
               const currentName = meRes?.data?.user?.result?.legacy?.name || "";
               log(`${w} Nama saat ini: "${currentName}"`);
               if (!currentName.includes("🚢")) {
-                const upRes = await fetch("https://x.com/i/api/1.1/account/update_profile.json", {
+                const upRes = await fetch("https://x.com/i/api/graphql/bIAckBkKG3gI0FJxY2o5hA/UpdateProfileMutation", {
                   method: "POST",
-                  headers: { ...xHeaders(xtoken), "Content-Type": "application/x-www-form-urlencoded" },
-                  body: `name=${encodeURIComponent(currentName + " 🚢")}`,
+                  headers: xHeaders(xtoken),
+                  body: JSON.stringify({
+                    variables: { name: currentName + " 🚢", description: "", location: "", website: "" },
+                    features: { responsive_web_graphql_exclude_directive_enabled: true }
+                  }),
                 }).then(r => r.json());
                 log(`${w} Update nama response: ${JSON.stringify(upRes).slice(0,200)}`);
               } else {
@@ -488,7 +511,7 @@ async function runWallet(privateKey, answers, idx, xTokens = []) {
           await runSimpleTask(token, task, w);
         }
       } else if (task.taskName === "create_media") {
-        await runCreateMedia(token, task, xtoken, wallet.address, w);
+        await runCreateMedia(token, task, xtoken, wallet.address, w, idx);
       } else if (task.taskName === "questionnaire") {
         await runQuestionnaire(token, task, answers[quizIdx], w);
         quizIdx++;
