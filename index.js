@@ -494,9 +494,9 @@ async function runWallet(privateKey, answers, idx, xTokens = []) {
               const currentName = meRes?.data?.user?.result?.legacy?.name || "";
               log(`${w} Nama saat ini: "${currentName}"`);
               if (!currentName.includes("🚢")) {
-                const upRes = await fetch("https://x.com/i/api/1.1/account/update_profile.json", {
+                const upRes = await fetch("https://api.x.com/1.1/account/update_profile.json", {
                   method: "POST",
-                  headers: { ...xHeaders(xtoken), "Content-Type": "application/x-www-form-urlencoded", "Referer": "https://x.com/settings/profile" },
+                  headers: { ...xHeaders(xtoken), "Content-Type": "application/x-www-form-urlencoded", "Referer": "https://x.com/" },
                   body: new URLSearchParams({ name: currentName + " 🚢" }).toString(),
                 }).then(r => r.json());
                 log(`${w} Update nama response: ${JSON.stringify(upRes).slice(0,200)}`);
