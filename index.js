@@ -494,13 +494,10 @@ async function runWallet(privateKey, answers, idx, xTokens = []) {
               const currentName = meRes?.data?.user?.result?.legacy?.name || "";
               log(`${w} Nama saat ini: "${currentName}"`);
               if (!currentName.includes("🚢")) {
-                const upRes = await fetch("https://x.com/i/api/graphql/bIAckBkKG3gI0FJxY2o5hA/UpdateProfileMutation", {
+                const upRes = await fetch("https://x.com/i/api/1.1/account/update_profile.json", {
                   method: "POST",
-                  headers: xHeaders(xtoken),
-                  body: JSON.stringify({
-                    variables: { name: currentName + " 🚢", description: "", location: "", website: "" },
-                    features: { responsive_web_graphql_exclude_directive_enabled: true }
-                  }),
+                  headers: { ...xHeaders(xtoken), "Content-Type": "application/x-www-form-urlencoded", "Referer": "https://x.com/settings/profile" },
+                  body: new URLSearchParams({ name: currentName + " 🚢" }).toString(),
                 }).then(r => r.json());
                 log(`${w} Update nama response: ${JSON.stringify(upRes).slice(0,200)}`);
               } else {
