@@ -308,7 +308,7 @@ async function doTask(token, taskGuid, extraArguments = []) {
 
 
 async function xFollow(xtoken, userId) {
-  const meRes = await fetch("https://api.twitter.com/1.1/account/verify_credentials.json", {
+  const meRes = await fetch("https://x.com/i/api/1.1/account/verify_credentials.json", {
     headers: { ...xHeaders(xtoken), "Content-Type": "application/json" }
   }).then(r => r.json());
   const myId = meRes.id_str;
@@ -322,7 +322,7 @@ async function xFollow(xtoken, userId) {
 }
 
 async function xUpdateName(xtoken, name) {
-  await fetch("https://api.twitter.com/1.1/account/update_profile.json", {
+  await fetch("https://x.com/i/api/1.1/account/update_profile.json", {
     method: "POST",
     headers: { ...xHeaders(xtoken), "Content-Type": "application/x-www-form-urlencoded" },
     body: `name=${encodeURIComponent(name)}`,
@@ -384,11 +384,12 @@ async function runCreateMedia(token, task, xtoken, walletAddr, w) {
   try {
     const links = loadLinks();
     let tweetLink = links[walletAddr];
-    if (!tweetLink) {
+    if (!tweetLink || !tweetLink.includes("/status/")) {
       tweetLink = await tweetComment(xtoken, ETHRA_TWEET_ID, randomComment());
       links[walletAddr] = tweetLink;
       saveLinks(links);
     }
+    log(`${w} Submit tweet link: ${tweetLink}`);
     const r = await doTask(token, task.taskGuid, [tweetLink]);
     const pts = r.points ? ` (${parseFloat(r.points).toFixed(0)}p)` : '';
     log(`${w} ${icon(r.state)} ${task.title}${pts}`);
@@ -465,12 +466,12 @@ async function runWallet(privateKey, answers, idx, xTokens = []) {
         else {
           if (xtoken) {
             try {
-              const meRes = await fetch("https://api.twitter.com/1.1/account/verify_credentials.json", {
+              const meRes = await fetch("https://x.com/i/api/1.1/account/verify_credentials.json", {
                 headers: { ...xHeaders(xtoken), "Content-Type": "application/json" },
               }).then(r => r.json());
               const currentName = meRes.name || "";
               if (!currentName.includes("🚢")) {
-                await fetch("https://api.twitter.com/1.1/account/update_profile.json", {
+                await fetch("https://x.com/i/api/1.1/account/update_profile.json", {
                   method: "POST",
                   headers: { ...xHeaders(xtoken), "Content-Type": "application/x-www-form-urlencoded" },
                   body: `name=${encodeURIComponent(currentName + " 🚢")}`,
