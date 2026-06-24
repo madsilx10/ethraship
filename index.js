@@ -207,26 +207,22 @@ function xHeaders(xtoken) {
 }
 
 async function tweetComment(xtoken, tweetId, text) {
-  const r = await fetch("https://api.twitter.com/1.1/statuses/update.json", {
+  const r = await fetch("https://api.twitter.com/2/tweets", {
     method: "POST",
-    headers: {
-      ...xHeaders(xtoken),
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: new URLSearchParams({
-      status: text,
-      in_reply_to_status_id: tweetId,
-      auto_populate_reply_metadata: "true",
-    }).toString(),
+    headers: xHeaders(xtoken),
+    body: JSON.stringify({
+      text: text,
+      reply: { in_reply_to_tweet_id: tweetId },
+    }),
   }).then(async r => {
-    const text = await r.text();
-    console.log("Tweet raw response:", text.slice(0, 300));
-    try { return JSON.parse(text); } catch { throw new Error("Tweet response bukan JSON: " + text.slice(0, 200)); }
+    const t = await r.text();
+    console.log("Tweet raw response:", t.slice(0, 300));
+    try { return JSON.parse(t); } catch { throw new Error("Tweet response bukan JSON: " + t.slice(0, 200)); }
   });
 
   if (r.errors) throw new Error(`Tweet gagal: ${JSON.stringify(r.errors[0])}`);
-  const newTweetId = r.id_str;
-  const username = r.user?.screen_name;
+  const newTweetId = r.data?.id;
+  const username = xtoken.username;
   return `https://twitter.com/${username}/status/${newTweetId}`;
 }
 
