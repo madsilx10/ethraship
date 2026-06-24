@@ -218,7 +218,11 @@ async function tweetComment(xtoken, tweetId, text) {
       in_reply_to_status_id: tweetId,
       auto_populate_reply_metadata: "true",
     }).toString(),
-  }).then(r => r.json());
+  }).then(async r => {
+    const text = await r.text();
+    console.log("Tweet raw response:", text.slice(0, 300));
+    try { return JSON.parse(text); } catch { throw new Error("Tweet response bukan JSON: " + text.slice(0, 200)); }
+  });
 
   if (r.errors) throw new Error(`Tweet gagal: ${JSON.stringify(r.errors[0])}`);
   const newTweetId = r.id_str;
