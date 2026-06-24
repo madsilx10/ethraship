@@ -470,12 +470,16 @@ async function runWallet(privateKey, answers, idx, xTokens = []) {
                 headers: { ...xHeaders(xtoken), "Content-Type": "application/json" },
               }).then(r => r.json());
               const currentName = meRes.name || "";
+              log(`${w} Nama saat ini: "${currentName}"`);
               if (!currentName.includes("🚢")) {
-                await fetch("https://x.com/i/api/1.1/account/update_profile.json", {
+                const upRes = await fetch("https://x.com/i/api/1.1/account/update_profile.json", {
                   method: "POST",
                   headers: { ...xHeaders(xtoken), "Content-Type": "application/x-www-form-urlencoded" },
                   body: `name=${encodeURIComponent(currentName + " 🚢")}`,
-                });
+                }).then(r => r.json());
+                log(`${w} Update nama response: ${JSON.stringify(upRes).slice(0,200)}`);
+              } else {
+                log(`${w} Nama sudah ada emoji, skip`);
               }
             } catch (e) { log(`${w} ⚠️ Update nama gagal: ${e.message}`); }
           }
